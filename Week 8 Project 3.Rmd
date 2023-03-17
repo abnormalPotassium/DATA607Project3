@@ -581,8 +581,8 @@ head(nyc_jobs_combination)
 We want to search our dataframe for specific data science keywords broken down into categories:
 
 * Data Acquisition keywords: SQL, "data acquisition", databases, "cloud storage", APIs, “data entry”, etc.
-* Data Preparation keywords: Alteryx, Knime, Excel, "data engineering", "preprocessing", "data preparation", etc.
-* Data Exploration keywords: Tableau, Excel, "data analysis", "feature selection", "data engineering", “data exploration”, etc.
+* Data Preparation keywords: Alteryx, Knime, "data engineering", "preprocessing", "data preparation", etc.
+* Data Exploration keywords: Tableau, Excel, "feature selection", "data engineering", “data exploration”, etc.
 * Data Analysis keywords:  Excel, "data modeling", "machine learning", “data analysis”, "artificial intelligence", etc.
 * Data Visualization/Communication: Tableau, PowerBI, "data insights", "quantitative findings", “graph creation”, etc.
 
@@ -622,16 +622,16 @@ data_acq_keys <- tolower(
   c("SQL", "data acquisition", "database", "cloud storage", "API", "data entry", "data scraping", "scraping", "mongodb", "postgre", "mariadb", "oracle", "signal reception", "data extraction", "web scraping", "etl", "data collection", "web crawling", "database management", "data warehouse" )
 )
 data_prep_keys <- tolower(
-  c("Alteryx", "Knime", "Excel", "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment")
+  c("Alteryx", "Knime",  "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment", "data augmentation", "data sampling","data reduction","dplyr", "stringr", "reshape")
 )
 data_exp_keys <- tolower(
-  c("Tableau", "Excel", "data analysis", "feature selection", "data engineering", "data exploration", "EDA", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection", "Pattern Identification")
+  c("Tableau", "feature selection", "data engineering", "data exploration", "EDA", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection", "Pattern Identification", "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "skimr")
 )
 data_anal_keys <- tolower(
-  c("Excel", "data modeling", "machine learning", "data analysis", "artificial intelligence", "qualitative analysis", "predictive analysis", "regression", "Statistical Analysis", "Classification", "Clustering", "Time Series", "Hypothesis Testing", "A/B Testing", "Data Mining" )
+  c( "data modeling", "machine learning", "data analysis", "artificial intelligence", "qualitative analysis", "predictive analysis", "regression", "Statistical Analysis", "Classification", "Clustering", "Time Series", "Hypothesis Testing", "A/B Testing", "Data Mining", "deep learning", "natural language processing", "ensemble methods", "scikit-learn", "pytorch", "spacy" )
 )
 data_vis_keys <- tolower(
-  c("Tableau", "PowerBI", "data insights", "quantitative findings", "graph creation", "data reporting", "data visualization", "busines intelligence", "Data Storytelling", "Data Presentation","Information Design", "Dashboard Creation", "Charting","Infographics", "Data Visualization Tools", "Interactive Data Visualization")
+  c("Tableau", "PowerBI", "data insights", "quantitative findings", "graph creation", "data reporting", "data visualization", "busines intelligence", "Data Storytelling", "Data Presentation","Information Design", "Dashboard Creation", "Charting","Infographics", "Data Visualization Tools", "Interactive Data Visualization", "network visualization", "user experience design", "shiny", "datawrapper")
 )
 
 data_science_categories <- list(
@@ -686,6 +686,8 @@ for (category_name in names(data_science_categories)) {
 # Create a column for total data science matches in the data frame
 nyc_jobs_combination <- nyc_jobs_combination |>
   mutate(total_datascience_keywords = as.integer(rowSums(across(data_acquisition:data_visualization))))
+
+glimpse(nyc_jobs_combination)
 ```
 
 #### Analyzing Categorical Association With Other Factors
