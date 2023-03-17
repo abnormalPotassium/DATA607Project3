@@ -2,7 +2,9 @@
 title: 'Project 3: Data Exploration'
 author: "Alice Ding"
 date: "2023-03-14"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Overview
@@ -13,7 +15,7 @@ The dataset our team has chosen to use for this project is a table of job postin
 
 The original table is comprised of 30 columns, but in order to make the data more digestible and easier to read, we've broken this table down into 4 smaller ones; below is an ERD of our relational database model. 
 
-![ERD](https://raw.githubusercontent.com/alu-potato/DATA607Project3/main/erd/Project3ERD2.png)
+![ERD](./erd/Project3ERD2.png)
 
 To keep things relevant, here are the fields we'll be going through as part of this exploratory analysis:
 
