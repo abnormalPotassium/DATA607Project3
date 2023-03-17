@@ -562,7 +562,7 @@ my_connection <- dbConnect(drv = odbc::odbc(),
                            )
 
 nyc_jobs_combination_sql <- r"(
-SELECT b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills
+SELECT b.job_id, b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills
 FROM nyc_jobs_basics as b 
 JOIN nyc_jobs_specifics as s ON b.job_id = s.job_id
 )"
@@ -571,7 +571,7 @@ nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
 
 dbDisconnect(my_connection)
 
-nyc_jobs_combination[,3:5] <- lapply(nyc_jobs_combination[,3:5], tolower)
+nyc_jobs_combination[,4:6] <- lapply(nyc_jobs_combination[,4:6], tolower)
 
 head(nyc_jobs_combination)
 ```
@@ -678,14 +678,14 @@ In order to be able to truly relate the keywords within each column to other inf
 ```{r keyword mutation}
 # Create the new columns in the data frame
 for (category_name in names(data_science_categories)) {
-  nyc_jobs_combination[[category_name]] <- as_tibble(sapply(data_science_categories[[category_name]],grepl,apply(nyc_jobs_combination[, 3:5], 1, paste, collapse = " "))) %>%
+  nyc_jobs_combination[[category_name]] <- as_tibble(sapply(data_science_categories[[category_name]],grepl,apply(nyc_jobs_combination[, 4:6], 1, paste, collapse = " "))) %>%
     mutate(!!category_name := if_any(where(is.logical)), .keep="none") %>%
     pull(!!category_name)
 }
 
 glimpse(nyc_jobs_combination)
 ```
-
+#### Analyzing Categorical Association With Other Factors
 
 ## Conclusions
 
