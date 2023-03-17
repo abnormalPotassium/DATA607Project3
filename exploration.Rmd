@@ -18,8 +18,8 @@ The original table is comprised of 30 columns, but in order to make the data mor
 To keep things relevant, here are the fields we'll be going through as part of this exploratory analysis:
 
 - `nyc_jobs_basics.job_id`: The job opening identification (“Job ID”) number that corresponds to and represents a job posting notice published on behalf of a New York City agency. 
-- `nyc_jobs_agencies.agency`: Name of the New York City agency (“agency” or “hiring agency”) where a job vacancy exists.
-- `posting_type: Identifies whether a job posting is an Internal or External posting. Internal postings are available to City employees only and external postings are available to the general public.
+- `nyc_jobs_basics.work_unit` (agency): Name of the New York City agency (“agency” or “hiring agency”) where a job vacancy exists.
+- `nyc_jobs_specifics.posting_type`: Identifies whether a job posting is an Internal or External posting. Internal postings are available to City employees only and external postings are available to the general public.
 - `nyc_jobs_basics.job_category` = The occupational group in which the posted job belongs, such as: Administration & Human Resources; Communications & Intergovernmental Affairs; Constituent Services & Community Programs; Engineering, Architecture, & Planning; Finance, Accounting, & Procurement; Health; Technology, Data & Innovation; Legal Affairs; Building Operations & Maintenance; Policy, Research & Analysis; Public Safety, Inspections, & Enforcement; Social Services
 - `nyc_jobs_basics.full_time_indicator`: "This denotes whether the job is a full time or part time employment; F - Full time; P - Part time"
 - `nyc_jobs_basics.career_level`: "This denotes the career level of the job. The possible career levels are:; Student; Entry-level; Experienced (non-manager); Manager; Executive"
@@ -77,7 +77,7 @@ overall_count <- nyc_jobs_basics |>
 sprintf("There are %i jobs currently posted.", overall_count$count)
 ```
 
-As of Thursday, March 16, there are 3,254 jobs currently available. 
+As of Thursday, March 17, there are 3,260 jobs currently available. 
 
 How can we break this down further?
 
@@ -98,10 +98,27 @@ counts_by_agency <- nyc_jobs_basics |>
             .groups = 'drop') |>
   arrange(desc(count))
 
-head(counts_by_agency, 5)
+head(counts_by_agency, 10)
 ```
 
-In total, there are 1,085 different agencies and no agency is more prevalent in job postings than another. The fact that the largest one only has 44 current job postings out of 3k+ (\~1%) shows that it's an extremely diverse collection of jobs.
+In total, there are 1,048 different agencies and no agency is more prevalent in job postings than another. The fact that the largest one only has 43 current job postings out of 3k+ (\~1%) shows that it's an extremely diverse collection of jobs.
+
+### Posting Type
+
+Are a majority of these listings internal or external?
+
+```{r posting_type}
+counts_by_posting_type <- nyc_jobs_specifics |> 
+  group_by(posting_type) |>
+  dplyr::summarise(count = n(),
+            percent = 100 * n()/nrow(nyc_jobs_basics),
+            .groups = 'drop') |>
+  arrange(desc(count))
+
+head(counts_by_posting_type)
+```
+
+Pretty close to 50/50, although internal is slightly higher at 55% vs. external's 45%.
 
 ### Job Category
 
@@ -120,7 +137,7 @@ counts_by_job_category <- nyc_jobs_basics |>
             .groups = 'drop') |>
   arrange(desc(count))
 
-head(counts_by_job_category)
+head(counts_by_job_category, 10)
 ```
 
 In total, there are 192 distinct job categories. Of these, we can see that the most common categories are `Engineering, Architecture, & Planning` (\~13%), `Technology, Data, & Innovation` (\~8%), `Legal Affairs` (7%), and `Administration & Human Resources` (\~6%). 
@@ -288,7 +305,7 @@ salary_to_summary
 
 salary_to_bar
 ```
-This one looks less like a bell-curve (still right-skewed though) and seems to have a high frequency at \~\$60k as well, however there seems to be more jobs with rates at the tail ends of the spectrum. We can see that the max here goes up to \~\$250k with more activity in the \~\$100k+ range. The mean and median here have been brought up though at \$89k and \$80k respectively while the minimum is also at \$30k; in general, these rates pay more as they're the at the higher end of the spectrum.
+This one looks less like a bell-curve (still right-skewed though) and seems to have a high frequency at \~\$60k as well, however there seems to be more jobs with rates at the tail ends of the spectrum. We can see that the max here goes up to \~\$250k with more activity in the \~\$100k+ range. The mean and median here have been brought up though at \$88k and \$80k respectively while the minimum is also at \$30k; in general, these rates pay more as they're the at the higher end of the spectrum.
 
 What does salary look like if we assume most folks get the middle point of each posted range?
 
@@ -338,5 +355,5 @@ count_by_date <- nyc_jobs_basics |>
 head(count_by_date, 10)
 ```
 
-It looks like a majority of these job listings are from this year and last year, however some of them are even from 2014. For the most part though, it seems like they're mostly recent as 46% of them are from this year, but it's only been \~3.5 months as it's only March.
+It looks like a majority of these job listings are from this year and last year, however some of them are even from 2014. For the most part though, it seems like they're mostly recent as 48% of them are from this year, but it's only been \~3.5 months as it's only March.
 
