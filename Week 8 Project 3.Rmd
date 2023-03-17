@@ -1,6 +1,6 @@
 ---
 title: "Project 3"
-author: "Alice, Farhana, Nick, Ross, and Taha,"
+author: "Alice, Farhana, Nick, Ross, and Taha"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -389,7 +389,7 @@ Interestingly, 72% (2.3k) of these jobs are for `Experienced (non-manager)` role
 
 #### Salary Information
 
-How do these jobs look in terms of salaray?
+How do these jobs look in terms of salary?
 
 ##### Frequency
 
