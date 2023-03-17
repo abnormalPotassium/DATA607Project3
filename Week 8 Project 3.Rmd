@@ -208,22 +208,27 @@ dbDisconnect(my_connection)
  
 ### Exploration
 
-First, we must connect to the database; we've chosen to use Azure as our hosting service.
 
-```{r azure_connect, eval = FALSE}
+To keep things relevant, here are the fields we'll be going through as part of this exploratory analysis:
+- `nyc_jobs_basics.job_id`: The job opening identification (“Job ID”) number that corresponds to and represents a job posting notice published on behalf of a New York City agency. 
+- `nyc_jobs_basics.work_unit` (agency): Name of the New York City agency (“agency” or “hiring agency”) where a job vacancy exists.
+- `nyc_jobs_specifics.posting_type`: Identifies whether a job posting is an Internal or External posting. Internal postings are available to City employees only and external postings are available to the general public.
+- `nyc_jobs_basics.job_category` : The occupational group in which the posted job belongs, such as: Administration & Human Resources; Communications & Intergovernmental Affairs; Constituent Services & Community Programs; Engineering, Architecture, & Planning; Finance, Accounting, & Procurement; Health; Technology, Data & Innovation; Legal Affairs; Building Operations & Maintenance; Policy, Research & Analysis; Public Safety, Inspections, & Enforcement; Social Services
+- `nyc_jobs_basics.full_time_indicator`: "This denotes whether the job is a full time or part time employment; F - Full time; P - Part time"
+- `nyc_jobs_basics.career_level`: "This denotes the career level of the job. The possible career levels are:; Student; Entry-level; Experienced (non-manager); Manager; Executive"
+- `nyc_jobs_basics.salary_range_from`: The lowest salary on a job posting for a position within the salary band for the related civil service title.
+- `nyc_jobs_basics.salary_range_to`: The highest salary on a job posting for a position within the salary band for the related civil service title.
+- `nyc_jobs_basics.salary_frequency`: The frequency of proposed salary.  Possible salary frequency values include “hourly”, “daily”, and “annual”. 
+- `nyc_jobs_basics.posting_date`: The date and time that a job vacancy was posted in MM/DD/YY format.
+
+First, we load in additional libraries that will be used for the data exploration.
+
+```{r additional library, message = FALSE}
 library(plyr)
-library(tidyverse)
-library(odbc)
-library(DBI)
-library(keyring)
 library(ggplot2)
-
-if (!("Overview8909" %in% as_vector(key_list()[2]))) {
-  key_set("Project3SQL","Overview8909")
-}
 ```
 
-Then we create dataframes in R that represent each table we are going to be working with.
+We must then connect to our database and create dataframes in R that represent each table we are going to be working with.
 
 ```{r pull_data}
 my_connection <- dbConnect(drv = odbc::odbc(),
@@ -257,7 +262,7 @@ overall_count <- nyc_jobs_basics |>
 sprintf("There are %i jobs currently posted.", overall_count$count)
 ```
 
-As of Thursday, March 16, there are 3,254 jobs currently available. 
+As of Friday, March 17, there are 3,260 jobs currently available. 
 
 How can we break this down further?
 
@@ -278,10 +283,27 @@ counts_by_agency <- nyc_jobs_basics |>
             .groups = 'drop') |>
   arrange(desc(count))
 
-head(counts_by_agency, 5)
+head(counts_by_agency, 10)
 ```
 
-In total, there are 1,085 different agencies and no agency is more prevalent in job postings than another. The fact that the largest one only has 44 current job postings out of 3k+ (\~1%) shows that it's an extremely diverse collection of jobs.
+In total, there are 1,048 different agencies and no agency is more prevalent in job postings than another. The fact that the largest one only has 44 current job postings out of 3k+ (\~1%) shows that it's an extremely diverse collection of jobs.
+
+
+### Posting Type
+
+Are a majority of these listings internal or external?
+
+```{r posting_type}
+counts_by_posting_type <- nyc_jobs_specifics |> 
+  group_by(posting_type) |>
+  dplyr::summarise(count = n(),
+            percent = 100 * n()/nrow(nyc_jobs_basics),
+            .groups = 'drop') |>
+  arrange(desc(count))
+head(counts_by_posting_type)
+```
+
+Pretty close to 50/50, although internal is slightly higher at 55% vs. external's 45%.
 
 #### Job Category
 
@@ -300,7 +322,7 @@ counts_by_job_category <- nyc_jobs_basics |>
             .groups = 'drop') |>
   arrange(desc(count))
 
-head(counts_by_job_category)
+head(counts_by_job_category, 10)
 ```
 
 In total, there are 192 distinct job categories. Of these, we can see that the most common categories are `Engineering, Architecture, & Planning` (\~13%), `Technology, Data, & Innovation` (\~8%), `Legal Affairs` (7%), and `Administration & Human Resources` (\~6%). 
@@ -468,7 +490,7 @@ salary_to_summary
 
 salary_to_bar
 ```
-This one looks less like a bell-curve (still right-skewed though) and seems to have a high frequency at \~\$60k as well, however there seems to be more jobs with rates at the tail ends of the spectrum. We can see that the max here goes up to \~\$250k with more activity in the \~\$100k+ range. The mean and median here have been brought up though at \$89k and \$80k respectively while the minimum is also at \$30k; in general, these rates pay more as they're the at the higher end of the spectrum.
+This one looks less like a bell-curve (still right-skewed though) and seems to have a high frequency at \~\$60k as well, however there seems to be more jobs with rates at the tail ends of the spectrum. We can see that the max here goes up to \~\$250k with more activity in the \~\$100k+ range. The mean and median here have been brought up though at \$88k and \$80k respectively while the minimum is also at \$30k; in general, these rates pay more as they're the at the higher end of the spectrum.
 
 What does salary look like if we assume most folks get the middle point of each posted range?
 
@@ -518,9 +540,124 @@ count_by_date <- nyc_jobs_basics |>
 head(count_by_date, 10)
 ```
 
-It looks like a majority of these job listings are from this year and last year, however some of them are even from 2014. For the most part though, it seems like they're mostly recent as 46% of them are from this year, but it's only been \~3.5 months as it's only March.
+It looks like a majority of these job listings are from this year and last year, however some of them are even from 2014. For the most part though, it seems like they're mostly recent as 48% of them are from this year, but it's only been \~3.5 months as it's only March.
 
 ### Data Analysis
+
+Now we want to work towards the main question of this data analysis: "Which are the most valued data science skills?" The approach that we are beginning with is breaking down data science keywords which are present within the job description, minimum qualification, and preferred skills columns. If we can figure out which data science key words appear the most, then we could attempt to determine which skills corresponding to these keywords are most in demand.
+
+#### Querying Data
+
+As we only need a subset of data from two tables for our analysis, we will go ahead and run a SQL query to retrieve the columns that we want.
+
+```{r get combined tables}
+
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd = key_get("Project3SQL","Overview8909"),
+                           encoding = "latin1"
+                           )
+
+nyc_jobs_combination_sql <- r"(
+SELECT b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills
+FROM nyc_jobs_basics as b 
+JOIN nyc_jobs_specifics as s ON b.job_id = s.job_id
+)"
+
+nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
+
+dbDisconnect(my_connection)
+head(nyc_jobs_combination)
+```
+
+#### High Level Look at Keywords
+
+We want to search our dataframe for specific data science keywords broken down into categories:
+
+* Data Acquisition keywords: SQL, "data acquisition", databases, "cloud storage", APIs, “data entry”, etc.
+* Data Preparation keywords: Alteryx, Knime, Excel, "data engineering", "preprocessing", "data preparation", etc.
+* Data Exploration keywords: Tableau, Excel, "data analysis", "feature selection", "data engineering", “data exploration”, etc.
+* Data Analysis keywords:  Excel, "data modeling", "machine learning", “data analysis”, "artificial intelligence", etc.
+* Data Visualization/Communication: Tableau, PowerBI, "data insights", "quantitative findings", “graph creation”, etc.
+
+To begin this analysis we can look at the count of keywords within the relevant dataframe columns as a whole. Although, this new dataframe can not be used for much further analyis, it would provide us a simple answer to which data science skills are most in demand based on this dataset.
+
+```{r detect keywords}
+library(stringi)
+
+search_keywords <- function(df, keywords, category) {
+  # Create a vector to store the counts of each keyword
+  word_count <- rep(0, length(keywords))
+  
+  # Loop through each row of the dataframe
+  for (i in 1:nrow(df)) {
+    # Convert all the text in each column to lowercase and combine them into a single string
+    text <- tolower(paste(df[i, ], collapse = " "))
+    # Loop through each keyword in the keyword list
+    for (j in 1:length(keywords)) {
+      # If the keyword is in the text, increment the count for that keyword
+        # ignore.case to make sure either "Python" or "python" is counted
+      if (stri_detect_regex(text, paste0("\\b", keywords[j], "\\b"), case_insensitive = TRUE)) {
+        word_count[j] <- word_count[j] + 1
+      }
+    }
+  }
+  
+  # Return the word counts as a tibble
+  keywords_count <- tibble(
+    category = category,
+    keyword = keywords,
+    count = word_count
+    )
+  return(keywords_count)
+}
+
+data_acq_keys <- c("SQL", "data acquisition", "database", "cloud storage", "API", "data entry", "data scraping", "scraping", "mongodb", "postgre", "mariadb", "oracle", "signal reception", "data extraction", "web scraping", "etl", "data collection", "web crawling", "database management", "data warehouse" )
+data_prep_keys <- c("Alteryx", "Knime", "Excel", "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment")
+data_exp_keys <- c("Tableau", "Excel", "data analysis", "feature selection", "data engineering", "data exploration", "EDA", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection", "Pattern Identification")
+data_anal_keys <- c("Excel", "data modeling", "machine learning", "data analysis", "artificial intelligence", "qualitative analysis", "predictive analysis", "regression", "Statistical Analysis", "Machine Learning","Classification", "Clustering", "Time Series", "Hypothesis Testing", "A/B Testing", "Data Mining" )
+data_vis_keys <- c("Tableau", "PowerBI", "data insights", "quantitative findings", "graph creation", "data reporting", "data visualization", "busines intelligence", "Data Storytelling", "Data Presentation","Information Design", "Dashboard Creation", "Charting","Infographics", "Data Visualization Tools", "Interactive Data Visualization")
+
+data_science_categories <- c(data_acq_keys, data_prep_keys, data_exp_keys, data_anal_keys, data_vis_keys)
+
+keyword_count <- rbind(
+  search_keywords(nyc_jobs_combination, data_acq_keys, "Data Acquisition"),
+  search_keywords(nyc_jobs_combination, data_prep_keys, "Data Preparation"),
+  search_keywords(nyc_jobs_combination, data_exp_keys, "Data Exploration"),
+  search_keywords(nyc_jobs_combination, data_anal_keys, "Data Analysis"),
+  search_keywords(nyc_jobs_combination, data_vis_keys, "Data Visualization")
+)
+
+head(arrange(keyword_count,desc(count)), n = 10)
+
+```
+If we look at the individual keywords themselves, it may come as no surprise that Excel is the number one skill of data scientists in demand. As most office jobs require Excel in some form or the other. We can also see which data science category itself ends up coming on top.
+
+```{r high level category count}
+
+keyword_count |>
+  group_by(category) |>
+  summarise(count = sum(count)) |>
+  arrange(count) |>
+  ggplot(aes(x= reorder(category,count),y=count, fill = category))+
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("Data Science Category") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Science Categories in NY Job Listings", caption = "(Based on data from NYC OpenData)") +
+    geom_text(aes(label=count)) +
+    coord_flip()
+
+```
+
+
+
+
+#### Mutating Data Based on Keywords
+
+In order to be able to truly relate the keywords within each column to other information within the dataset, we will need to create new columns on the dataset that count matches for each data science skill type. We have broken down data science skills into the following categories:
 
 ## Conclusions
 
