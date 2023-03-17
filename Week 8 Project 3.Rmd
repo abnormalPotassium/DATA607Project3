@@ -673,18 +673,21 @@ keyword_count |>
 
 #### Mutating Data Based on Keywords
 
-In order to be able to truly relate the keywords within each column to other information within the dataset, we will need to create new columns on the dataset that detects matches for each data science skill category. This will be stored in boolean format.
+In order to be able to truly relate the keywords within each column to other information within the dataset, we will need to create new columns on the dataset that detects matches for each data science skill category. The number of matches is stored as an integer for each column. We then also create a total matches that can perhaps be used to measure how relevant a job is to data science.
 
 ```{r keyword mutation}
-# Create the new columns in the data frame
+# Create the new columns in the data frame which count up keyword matches within each category
 for (category_name in names(data_science_categories)) {
   nyc_jobs_combination[[category_name]] <- as_tibble(sapply(data_science_categories[[category_name]],grepl,apply(nyc_jobs_combination[, 4:6], 1, paste, collapse = " "))) %>%
-    mutate(!!category_name := if_any(where(is.logical)), .keep="none") %>%
+    mutate(!!category_name := as.integer(rowSums(across(where(is.logical)))), .keep="none") %>%
     pull(!!category_name)
 }
 
-glimpse(nyc_jobs_combination)
+# Create a column for total data science matches in the data frame
+nyc_jobs_combination <- nyc_jobs_combination |>
+  mutate(total_datascience_keywords = as.integer(rowSums(across(data_acquisition:data_visualization))))
 ```
+
 #### Analyzing Categorical Association With Other Factors
 
 ## Conclusions
