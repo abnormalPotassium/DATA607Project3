@@ -1,0 +1,88 @@
+## Getting Data to where you can see the issue
+```{r connect to Azure SQL Server}
+library(tidyverse)
+library(odbc)
+library(DBI)
+library(keyring)
+
+if (!("Overview8909" %in% as_vector(key_list()[2]))) {
+  key_set("Project3SQL","Overview8909")
+}
+
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd='Caterer Uproot Streak Herself Greeter Coma Eatable8 Mystified',
+                           encoding = "latin1"
+                           )
+
+nyc_jobs_combination_sql <- "SELECT b.job_id, b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills FROM nyc_jobs_basics as b JOIN nyc_jobs_specifics as s ON b.job_id = s.job_id"
+
+nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
+
+dbDisconnect(my_connection)
+
+nyc_jobs_combination[,4:6] <- lapply(nyc_jobs_combination[,4:6], tolower)
+
+nrow(nyc_jobs_combination)
+
+data_acq_keys <- tolower(
+  c("SQL", "MySQL", "NoSQL", "data acquisition", "database", "dbms", "JSON", "API", "data entry", "data scraping", "digitalocean", "mongodb", "postgre", "mariadb", "signal reception", "data extraction", "web scraping", "etl", "data collection", "web crawling", "data warehouse", "azure", "Amazon Web Services" )
+)
+data_prep_keys <- tolower(
+  c("Alteryx", "Knime",  "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment", "data augmentation", "data sampling","data reduction", "dplyr", "stringr", "pandas" )
+)
+data_exp_keys <- tolower(
+  c("Tableau", "feature selection", "data engineering", "data exploration", "EDA", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "dimension reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection", "Pattern Identification", "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "skimr", "kusto", "azure data explorer", "data mining")
+)
+data_anal_keys <- tolower(
+  c( "data modeling", "machine learning", "data analysis", "artificial intelligence", "qualitative analysis", "predictive analysis", "regression", "Statistical Analysis", "statistical analytics", "Cluster Analysis", "Clustering Analysis", "Hypothesis Testing", "A/B Testing", "Data Mining", "deep learning", "natural language processing", "ensemble methods", "scikit-learn", "pytorch", "spacy", "data analytics","pandas", "RStudio", "spss" )
+)
+data_vis_keys <- tolower(
+  c("Tableau", "PowerBI", "quantitative findings", "creating graphs", "chart creation", "data reporting", "data visualization", "Data Storytelling", "Data Presentation", "Information Design", "Dashboard Creation", "Infographics", "network visualization", "user experience design", "datawrapper", "apache superset")
+)
+
+data_science_categories <- list(
+  data_acquisition = data_acq_keys, 
+  data_preparation = data_prep_keys,
+  data_exploration = data_exp_keys, 
+  data_analysis = data_anal_keys, 
+  data_visualization = data_vis_keys
+)
+
+nyc_jobs_combination_sql <- "
+SELECT b.job_id, b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills
+FROM nyc_jobs_basics as b 
+JOIN nyc_jobs_specifics as s ON b.job_id = s.job_id"
+
+nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
+
+dbDisconnect(my_connection)
+nyc_jobs_combination[,4:6] <- lapply(nyc_jobs_combination[,4:6], tolower)
+
+```
+
+## List of Keywords to Search Each Row For in nyc_jobs_combination
+```{r}
+ds_keywords_full <- c(data_acq_keys,data_prep_keys,data_exp_keys,data_anal_keys,data_vis_keys)
+```
+
+##Approach to doing so
+```{r}
+nyc_jobs_combination <- nyc_jobs_combination |> 
+  rowwise() |> 
+  mutate(skill_extract1 = paste(ds_keywords_full[map_lgl(ds_keywords_full, \(b) b %in% c_across(business_title:preferred_skills))], collapse = ", "))
+
+#Approach 2 works
+nyc_jobs_combination$skill_extract2 <- apply(nyc_jobs_combination[,2:6], 1, function(x) paste(x[x %in% ds_keywords_full], collapse = ', '))
+
+#Approach 3 works
+nyc_jobs_combination <- nyc_jobs_combination %>% 
+  mutate(across(business_title:preferred_skills, ~case_when(. %in% ds_keywords_full ~ .), .names = 'new_{col}')) %>%
+  unite(skill_extract3, starts_with('new'), na.rm = TRUE, sep = ', ')
+```
+
+
+
