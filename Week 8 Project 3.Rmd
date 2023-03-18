@@ -1,6 +1,6 @@
 ---
 title: "Project 3"
-author: "Alice, Farhana, Nick, Ross, and Taha"
+author: "Alice, Farhana, Nick, Ross, and Taha,"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -389,7 +389,7 @@ Interestingly, 72% (2.3k) of these jobs are for `Experienced (non-manager)` role
 
 #### Salary Information
 
-How do these jobs look in terms of salary?
+How do these jobs look in terms of salaray?
 
 ##### Frequency
 
@@ -653,7 +653,7 @@ keyword_count <- rbind(
 head(arrange(keyword_count,desc(count)), n = 10)
 
 ```
-If we look at the individual keywords themselves, it may come as no surprise that Excel is the number one skill of data scientists in demand. As most office jobs require Excel in some form or the other. We can also see which data science category itself ends up coming on top.
+If we look at the individual keywords themselves, it may come as no surprise that database is the number one skill of data scientists in demand. As most office jobs require working with a database either indirectly or directly. We can also see which data science category itself ends up coming on top.
 
 ```{r high level category count}
 
@@ -689,8 +689,243 @@ nyc_jobs_combination <- nyc_jobs_combination |>
 
 glimpse(nyc_jobs_combination)
 ```
+As we'll be utilizing this dataframe between group members, it makes sense to make a new database table for storing this dataframe data so it can quickly be referenced.
 
-#### Analyzing Categorical Association With Other Factors
+```{r new combination table, eval = FALSE}
+
+query5 <- r"(
+  CREATE TABLE nyc_jobs_combination(
+    job_id INT,
+    business_title VARCHAR(150),
+    job_category VARCHAR(300),
+    job_description VARCHAR(MAX),
+    minimum_qual VARCHAR(MAX),
+    preferred_skills VARCHAR(4000),
+    data_acquisition INT,
+    data_preparation INT,
+    data_exploration INT,
+    data_analysis INT,
+    data_visualization INT,
+    total_datascience_keywords INT,
+    PRIMARY KEY (job_id));
+)"
+
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd = key_get("Project3SQL","Overview8909"),
+                           encoding = "latin1"
+                           )
+
+query_combination <- c(query5)
+for (query in query_combination) {
+  dbExecute(my_connection,query)
+  Sys.sleep(1)
+}
+
+dbAppendTable(my_connection,"nyc_jobs_combination", nyc_jobs_combination)
+
+dbDisconnect(my_connection)
+```
+
+With the new table created and populated, we can access it again at anytime by running the following:
+
+```{r get combination table}
+nyc_jobs_combination_sql <- "select * from nyc_jobs_combination"
+
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd = key_get("Project3SQL","Overview8909"),
+                           encoding = "latin1"
+                           )
+
+nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
+
+dbDisconnect(my_connection)
+```
+
+
+#### Analyzing Association With Other Factors
+
+Since we've answered the question about which are the most valued data science skills, let's also take a stab at related questions with the information we have
+
+##### Which job category has the most postings for Data related roles?
+
+Let's assume we were a data scientists looking through these postings, and we wanted to filter down the jobs to be most relevant to data science through the job category. As there is no direct "data science" category, we can analyze our data to find which category has the most postings for data related roles.
+
+First, we'll need to define a data related role. While skimming through the data, in this format we can notice that there are many jobs where one or two keywords are found but they aren't really focused on the data aspects. In order to get around this we'll define a data related role as a job where there are three or more total keywords detected.
+
+```{r job category breakdown}
+library(RColorBrewer)
+
+nyc_jobs_combination %>%
+  filter(total_datascience_keywords > 2) %>%
+  group_by(job_category) %>%
+  dplyr::summarise(count = n())|>
+  arrange(desc(count)) |>
+  head(10) |>
+  ggplot(aes(x= reorder(job_category,count),y=count, fill = job_category))+
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("Job Category") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Roles in Job Category Count", caption = "(Based on data from NYC OpenData)") +
+    geom_text(aes(label=count)) +
+    scale_fill_brewer(palette = 'RdYlGn') +
+    coord_flip()
+```
+Looking into the result we have here, it comes as no surprise that the "Technology, Data & Innovation" job category has the most data roles by over 300% of the next one "Engineering, Architecture & Planning" which is also not much of a surprise at second place. It's more interesting in this case to look at job categories that are unexpected results. 
+
+"Policy, Research & Analysis" while having analysis in the name does not immediately make one think of data science roles. Policy evokes more of a feel of a senator going through old documents to outline what exactly should be legal or not. However in this day and age, data skills are necessary in this field to gather, organize, and analyze data in order to identify patterns, trends, and insights that can inform policy decisions and drive evidence-based research. A much better approach than just feeling out what would make a good policy.
+
+"Constituent Services & Community Programs" is also another one out of the left field. However, the reasoning becomes more clear thinking about it in this role, you may need to analyze data related to the community's demographics, needs, and priorities to develop effective programs and initiatives that meet their needs. This could involve analyzing survey data, census data, and other relevant data sources to identify patterns and trends.
+
+##### Which NYC agency has the most postings for Data related roles?
+
+Let's say we're doing an investigation on what agency in NYC might be the easiest one to apply to in order to get a role related to data science. We can determine this by joining agency information from other tables on our combination dataframe. Then we take the same filtering criteria and group by agency.
+
+```{r job agency breakdown}
+nyc_jobs_basics_small <- nyc_jobs_basics |>
+  select(job_id,work_unit)
+
+nyc_jobs_combination |>
+  filter(total_datascience_keywords > 2) |>
+  inner_join(nyc_jobs_basics_small, by="job_id") |>
+  inner_join(nyc_jobs_agencies, by = "work_unit")|>
+  group_by(agency) |>
+  dplyr::summarise(count = n()) |>
+  arrange(desc(count)) |>
+  head(10) |>
+  ggplot(aes(x= reorder(agency,count),y=count, fill = agency))+
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("Job Agency") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Roles in Job Agency Count", caption = "(Based on data from NYC OpenData)") +
+    geom_text(aes(label=count)) +
+    scale_fill_brewer(palette = 'RdYlGn') +
+    coord_flip()
+```
+As we can see, the distribution of data science job by agency for the top 10 is more spread out than the distribution per category. This can lead us to believe that the job agency matters less for job listings being determined as data science jobs. We can also determine that if we were to apply for jobs by only looking at the agency, picking a job from the department of environmental protection would be our best bet.
+
+##### Which are the most common job titles related to data skills?
+
+Now let's say that we wanted to look at what job titles we should be applying for based on what type of data science skill we've specialize in. Using our data we can determine what job titles correspond to each skillset the most. We use the civil service title for determining job titles as they are much more general than the business titles.
+
+```{r job title breakdown, fig.width=20, fig.height=20}
+library(patchwork)
+library(purrr)
+library(cowplot)
+library(glue)
+
+nyc_jobs_basics_small2 <- nyc_jobs_basics |>
+  select(job_id,title_code_num)
+
+nyc_jobs_combination2 <- nyc_jobs_combination |>
+  inner_join(nyc_jobs_basics_small2, by="job_id") |>
+  inner_join(nyc_jobs_codes, by="title_code_num") |>
+  group_by(civil_service_title) |>
+  dplyr::summarise(total_datascience_keywords = sum(total_datascience_keywords), data_acquisition = sum(data_acquisition), data_analysis = sum(data_analysis), data_visualization = sum(data_visualization), data_preparation = sum(data_preparation), data_exploration = sum(data_exploration)) |>
+  arrange(desc(total_datascience_keywords))
+
+# create a vector of keyword column names
+keyword_cols <- c("total_datascience_keywords", "data_acquisition", "data_analysis", "data_visualization", "data_preparation", "data_exploration")
+
+# create an empty list to store plots
+plot_list <- list()
+
+for (col in keyword_cols) {
+  p <- nyc_jobs_combination2 |>
+    slice_max(!!sym(col),n = 8,with_ties = FALSE) |>
+    ggplot(aes(x = reorder(civil_service_title,!!sym(col)), y = !!sym(col), fill = civil_service_title)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      ggtitle(col) +
+      xlab("Job Title") +
+      ylab("Keyword Count") +
+      labs(title = str_replace_all(glue("Job Titles with {col}"),"_"," "), caption = "(Based on data from NYC OpenData)") +
+      geom_text(aes(label=!!sym(col))) +
+      scale_fill_brewer(palette = 'Accent') +
+      coord_flip()
+      # add the plot to the plot_list
+  plot_list[[col]] <- p
+}
+
+plot_grid(plot_list[[2]], plot_list[[3]],
+          plot_list[[4]], plot_list[[5]],
+          plot_list[[6]], plot_list[[1]],
+          nrow = 3, ncol = 2)
+```
+
+We can answer quite a few related questions with these graphs. First and foremost, we can tackle the jobs that require the most data science skills as a whole. Those jobs would include: a city research scientist, computer specialist, and community coordinator. We'll see city research scientist and computer specialist pop up in the top 3 of the different graphs again and again, however community coordinator has a few skills from each of the sector but that still adds up.
+
+Those who are interested in specifically data acquisition could focus on being a a city research scientist, computer specialist, or community coordinator.
+
+Those who are interested in specifically data visualization do not have many choices, and could focus on being a a city research scientist, IT project specialist, or eligibility specialist.
+
+Those who are interested in specifically data preparation could focus on being a a city research scientist, computer specialist, or computer systems manager.
+
+Those who are interested in specifically data analysis could focus on being a a city research scientist, administrative staff analyst, or staff analyst.
+
+Those who are interested in specifically data exploration could focus on being a a city research scientist, clerical associate, or agency attorney.
+
+##### Do jobs which require data skills pay more than those which don't? 
+
+Say we're interested in money (to be fair who isn't?) Specifically the amount of money that data science skills bring in. We want to see if there is a positive correlation between the mean salary and the total amount of data skills that were detected in the job posting. To do this we adjust the salary to a normalized yearly salary like we did in the data exploration. Then we plot a scatterplot with a correlation line through to determine any relationship. 
+
+```{r job money skill breakdown}
+nyc_jobs_basics_small3 <- nyc_jobs_basics |>
+  select(job_id,salary_range_from, salary_range_to, salary_frequency)
+
+salary_from_adjusted <- c()
+salary_to_adjusted <- c()
+
+freq <- ""
+
+for(i in 1:nrow(nyc_jobs_basics_small3)) {
+    freq <- nyc_jobs_basics_small3$salary_frequency[i]
+    if (freq == "Annual") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics_small3$salary_range_from[i], 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics_small3$salary_range_to[i], 10000))
+    } else if (freq == "Hourly") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics_small3$salary_range_from[i] * 40 * 52, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics_small3$salary_range_to[i] * 40 * 52, 10000))
+    } else { # this means it's daily
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics_small3$salary_range_from[i] * 365, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics_small3$salary_range_to[i] * 365, 10000))
+    }
+}
+
+nyc_jobs_basics_small3$salary_from_adjusted <- salary_from_adjusted
+nyc_jobs_basics_small3$salary_to_adjusted <- salary_to_adjusted
+
+nyc_jobs_basics_small3 <- nyc_jobs_basics_small3 |>
+  select(job_id,salary_from_adjusted, salary_to_adjusted) |>
+  mutate(salary_mid_adjusted = (salary_from_adjusted + salary_to_adjusted)/2) |>
+  select(job_id,salary_mid_adjusted)
+
+nyc_jobs_combination3 <- nyc_jobs_combination |>
+  inner_join(nyc_jobs_basics_small3, by="job_id")
+
+ggplot(nyc_jobs_combination3,aes(x=total_datascience_keywords,y=salary_mid_adjusted)) +
+    geom_jitter() +
+    geom_smooth(method = lm, formula = y ~ x) +
+    labs(title = "Correlation Between # of Data Skills Required and Pay", caption = "(Based on data from NYC OpenData)") +
+    xlab("Data Science Keyword Count") +
+    ylab("Salary Range Median")
+```
+The scatterplot we end up with is very dense and concentrated on those jobs without any data science keywords in the listing. However, those without any data science keywords in the listing are also grouped up towards the bottom quadrant of pay. As we increase the data science keyword count, the lower end of the salary range increases. This does provide a positive relationship with data science keyword count and median salary range of a job listing. However, the lack of data towards the higher end of the keyword counts doesn't instill confidence in this assessment. 
+
+The next step is finding out, just how correlated the two variables are.
+
+```{r correlation skills and pay}
+
+cor(x=nyc_jobs_combination3$total_datascience_keywords,y=nyc_jobs_combination3$salary_mid_adjusted)
+
+```
+With a correlation of 0.11 between pay and total data science keyword count, we can say that within our data there is no relationship between the two. A very unfortunate discovery.
 
 ## Conclusions
 
