@@ -174,7 +174,6 @@ nyc_jobs_codes <- nyc_jobs_raw |> #Use this as this an outline for each new data
 nyc_jobs_codes <- nyc_jobs_codes[!duplicated(nyc_jobs_codes$title_code_num),]
 nyc_jobs_agencies <- nyc_jobs_raw |> 
   select(c('agency', 'agency_location', 'work_unit'))
-# nyc_jobs_agencies <- nyc_jobs_agencies[!duplicated(nyc_jobs_agencies$work_unit),]
 nyc_jobs_agencies <- nyc_jobs_agencies[!duplicated(tolower(nyc_jobs_agencies$work_unit)),]
 nyc_jobs_agencies
 nyc_jobs_specifics <- nyc_jobs_raw |> 
@@ -206,7 +205,7 @@ dbDisconnect(my_connection)
 ```
  
  
-### Exploration
+## Data Exploration
 
 
 To keep things relevant, here are the fields we'll be going through as part of this exploratory analysis:
@@ -542,13 +541,15 @@ head(count_by_date, 10)
 
 It looks like a majority of these job listings are from this year and last year, however some of them are even from 2014. For the most part though, it seems like they're mostly recent as 48% of them are from this year, but it's only been \~3.5 months as it's only March.
 
-### Data Analysis
+## Data Analysis
 
-Now we want to work towards the main question of this data analysis: "Which are the most valued data science skills?" The approach that we are beginning with is breaking down data science keywords which are present within the job description, minimum qualification, and preferred skills columns. If we can figure out which data science key words appear the most, then we could attempt to determine which skills corresponding to these keywords are most in demand.
+Now that the data has been loaded into SQL, tidied, and explored, we will answer the project's primary question: "What are the most valued data science skills?" We will accomplish this by searching job postings on the City of New York official jobs site, identifying and quantifying requested skills in job descriptions which are part of the data science workflow. Our group will theorize about which skills in the data science workflow are "most valued" by determining how many jobs in the NYC government request those skills.
 
-#### Querying Data
+##### Querying Data
 
 As we only need a subset of data from two tables for our analysis, we will go ahead and run a SQL query to retrieve the columns that we want.
+
+Not every field within our database is helpful for answering the project question. Here we create a custom table through a join, pulling only fields which can be searched for data science skills: business_title (e.g. data analyst), job_category (e.g. Finance), job_description, minimum_qual (e.g. college major), and preferred_skills. This table is 3,260 rows long with each row being a job posting.
 
 ```{r get combined tables}
 
@@ -576,19 +577,44 @@ nyc_jobs_combination[,4:6] <- lapply(nyc_jobs_combination[,4:6], tolower)
 head(nyc_jobs_combination)
 ```
 
-#### High Level Look at Keywords
+#### Approach
 
-We want to search our dataframe for specific data science keywords broken down into categories:
+For each job posting (row) we want to find all mentions of data science skills, searching them and compiling a count into a new dataframe. 
 
-* Data Acquisition keywords: SQL, "data acquisition", databases, "cloud storage", APIs, “data entry”, etc.
-* Data Preparation keywords: Alteryx, Knime, "data engineering", "preprocessing", "data preparation", etc.
-* Data Exploration keywords: Tableau, Excel, "feature selection", "data engineering", “data exploration”, etc.
-* Data Analysis keywords:  Excel, "data modeling", "machine learning", “data analysis”, "artificial intelligence", etc.
-* Data Visualization/Communication: Tableau, PowerBI, "data insights", "quantitative findings", “graph creation”, etc.
+First we need to define the skills we'll search for. These keywords were generated using a combination of domain knowledge, Google Ads keyword planner, and skimming the jobs data set for requested skills. While leveraging regular expressions could make this list of keywords shorter, because there are generally so many keywords of interest, the amount of time to write regex for each would be burdensome. Therefore for this project we will searchf for whole keywords, while avoiding ambiguity.
+
+```{r}
+data_acq_keys <- tolower(
+  c("SQL", "MySQL", "data acquisition", "database", "dbms", "JSON", "API", "data entry", "data scraping", "mongodb", "postgre", "mariadb", "data extraction", "web scraping", "etl", "data collection", "web crawling", "data warehouse", "azure", "Amazon Web Services" )
+)
+data_prep_keys <- tolower(
+  c("Alteryx", "Knime",  "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment", "data augmentation", "data sampling","data reduction", "dplyr", "stringr", "pandas" )
+)
+data_exp_keys <- tolower(
+  c("exploratory data analysis", "feature selection", "data engineering", "data exploration", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "dimension reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection",  "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "kusto", "azure data explorer")
+)
+data_anal_keys <- tolower(
+  c("data modeling", "machine learning", "data analysis", "artificial intelligence", "quantitative analysis", "predictive analysis", "regression", "Statistical Analysis", "statistical analytics", "Cluster Analysis", "Hypothesis Testing", "A/B Testing", "Data Mining", "natural language processing", "scikit-learn", "pytorch", "data analytics","pandas", "RStudio", "spss" )
+)
+data_vis_keys <- tolower(
+  c("Tableau", "PowerBI", "quantitative findings", "creating graphs", "chart creation", "data reporting", "data visualization", "Data Storytelling", "Data Presentation", "Information Design", "Dashboard Creation", "Infographics", "network visualization", "user experience design", "datawrapper", "apache superset", "scientific visualization", "visual analytics", "visual encodings", "data animation")
+)
+
+data_science_categories <- list(
+  data_acquisition = data_acq_keys, 
+  data_preparation = data_prep_keys,
+  data_exploration = data_exp_keys, 
+  data_analysis = data_anal_keys, 
+  data_visualization = data_vis_keys
+)
+```
+
+##### Skill Scrape
 
 To begin this analysis we can look at the count of keywords within the relevant dataframe columns as a whole. Although, this new dataframe can not be used for much further analyis, it would provide us a simple answer to which data science skills are most in demand based on this dataset.
 
 ```{r detect keywords}
+library(scales)
 library(stringi)
 
 search_keywords <- function(df, keywords, category) {
@@ -618,30 +644,6 @@ search_keywords <- function(df, keywords, category) {
   return(keywords_count)
 }
 
-data_acq_keys <- tolower(
-  c("SQL", "data acquisition", "database", "cloud storage", "API", "data entry", "data scraping", "scraping", "mongodb", "postgre", "mariadb", "oracle", "signal reception", "data extraction", "web scraping", "etl", "data collection", "web crawling", "database management", "data warehouse" )
-)
-data_prep_keys <- tolower(
-  c("Alteryx", "Knime",  "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment", "data augmentation", "data sampling","data reduction","dplyr", "stringr", "reshape")
-)
-data_exp_keys <- tolower(
-  c("Tableau", "feature selection", "data engineering", "data exploration", "EDA", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection", "Pattern Identification", "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "skimr")
-)
-data_anal_keys <- tolower(
-  c( "data modeling", "machine learning", "data analysis", "artificial intelligence", "qualitative analysis", "predictive analysis", "regression", "Statistical Analysis", "Classification", "Clustering", "Time Series", "Hypothesis Testing", "A/B Testing", "Data Mining", "deep learning", "natural language processing", "ensemble methods", "scikit-learn", "pytorch", "spacy" )
-)
-data_vis_keys <- tolower(
-  c("Tableau", "PowerBI", "data insights", "quantitative findings", "graph creation", "data reporting", "data visualization", "busines intelligence", "Data Storytelling", "Data Presentation","Information Design", "Dashboard Creation", "Charting","Infographics", "Data Visualization Tools", "Interactive Data Visualization", "network visualization", "user experience design", "shiny", "datawrapper")
-)
-
-data_science_categories <- list(
-  data_acquisition = data_acq_keys, 
-  data_preparation = data_prep_keys,
-  data_exploration = data_exp_keys, 
-  data_analysis = data_anal_keys, 
-  data_visualization = data_vis_keys
-)
-
 keyword_count <- rbind(
   search_keywords(nyc_jobs_combination, data_acq_keys, "Data Acquisition"),
   search_keywords(nyc_jobs_combination, data_prep_keys, "Data Preparation"),
@@ -649,17 +651,20 @@ keyword_count <- rbind(
   search_keywords(nyc_jobs_combination, data_anal_keys, "Data Analysis"),
   search_keywords(nyc_jobs_combination, data_vis_keys, "Data Visualization")
 )
-
-head(arrange(keyword_count,desc(count)), n = 10)
-
 ```
-If we look at the individual keywords themselves, it may come as no surprise that database is the number one skill of data scientists in demand. As most office jobs require working with a database either indirectly or directly. We can also see which data science category itself ends up coming on top.
 
+The dataframe keyword_count now shows the volume of mentions for each skill inside the NYC jobs dataset.
+
+```{r head keyword_count}
+head(arrange(keyword_count,desc(count)), n = 10)
+```
+
+We can also breakdown the data by category and see data acquisiton skills are most in demand within our data.
 ```{r high level category count}
 
 keyword_count |>
   group_by(category) |>
-  summarise(count = sum(count)) |>
+  dplyr::summarise(count = sum(count)) |>
   arrange(count) |>
   ggplot(aes(x= reorder(category,count),y=count, fill = category))+
     geom_bar(stat="identity", show.legend = FALSE) +
@@ -671,9 +676,135 @@ keyword_count |>
 
 ```
 
-#### Mutating Data Based on Keywords
+There were 47 individual data science skills mentioned on the NYC jobs postings.
 
-In order to be able to truly relate the keywords within each column to other information within the dataset, we will need to create new columns on the dataset that detects matches for each data science skill category. The number of matches is stored as an integer for each column. We then also create a total matches that can perhaps be used to measure how relevant a job is to data science.
+```{r keyword_count count}
+keyword_count |>
+  filter(count>0) |>
+  nrow()
+```
+
+Showing only skills with more than 10 occurrences in the dataset, then charting them. Colors based on category of Data Science skill.
+
+To answer the primary project question, the most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the category of "Data Acquisition."
+
+```{r keyword occurence bar graph}
+keyword_count |>
+  filter(count>10) |>
+  group_by(keyword,category) |>
+  summarise(count = sum(count)) |>
+  arrange(count) |>
+  ggplot(aes(x= reorder(keyword,count),y=count, fill = category))+
+    geom_bar(stat="identity", show.legend = TRUE) +
+    xlab("Data Science Skill") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Science Skills in NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
+    guides(fill=guide_legend(title="Skill Category")) +
+    geom_text(aes(label=count)) +
+    coord_flip()
+```
+
+Of the 3,261 jobs listed on the NYC government site, 57.5% require a data science skill.
+
+```{r percentage skills}
+nyc_jobs_combination |>
+  filter(total_datascience_keywords>0) |>
+  nrow()/nrow(nyc_jobs_combination)
+```
+
+While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
+
+```{r percentage skills breakdown}
+keyword_count <- keyword_count |> 
+  group_by(category,keyword) |>
+  mutate(pct_all_jobs = percent(count/nrow(nyc_jobs_combination)))
+```
+
+```{r more keyword breakdown}
+keyword_count |>
+  filter(pct_all_jobs>=0.5) |>
+  group_by(keyword,category,pct_all_jobs) |>
+  summarise(pct = sum(count)/nrow(nyc_jobs_combination))|>
+  ggplot(aes(x= reorder(keyword,pct),y=round(pct,2)*100, fill = category))+
+    geom_bar(stat="identity", show.legend = TRUE) +
+    xlab("Data Science Skill") +
+    ylab("% of All Jobs Requiring Skill") +
+    labs(title = "Top Data Science Skills as % of NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
+    guides(fill=guide_legend(title="Skill Category")) +
+    geom_text(aes(label=percent(round(pct,3)))) +
+    coord_flip()
+```
+
+##### Orginal Dataframe Keyword Integration
+
+If we combine our scraped skills list with information in the original database, we can look at the median base salaries for jobs requiring a given skill. Median base salaries are based on the median value of aggregated "Salary From" value for jobs requiring a given skill.
+
+```{r dataframe keyword integration}
+ds_keywords_full <- c(data_acq_keys,data_prep_keys,data_exp_keys,data_anal_keys,data_vis_keys)
+
+nyc_jobs_w_skills <- nyc_jobs_combination |> 
+  rowwise() |>
+  mutate(skill_extract = paste(ds_keywords_full[map_lgl(ds_keywords_full, ~ any(grepl(.x, c_across(business_title:preferred_skills))))], collapse = ", "))
+
+nyc_jobs_skills <- nyc_jobs_w_skills[c('job_id','skill_extract')]
+```
+
+```{r dataframe keyword integration 2}
+library(plyr)
+
+nyc_jobs_salaries <- dbGetQuery(my_connection, "select job_id, salary_range_from, salary_range_to, salary_frequency from nyc_jobs_basics")
+
+salary_from_adjusted <- c()
+salary_to_adjusted <- c()
+freq <- ""
+
+for(i in 1:nrow(nyc_jobs_salaries)) {
+    freq <- nyc_jobs_salaries$salary_frequency[i]
+    if (freq == "Annual") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i], 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i], 10000))
+    } else if (freq == "Hourly") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 40 * 52, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 40 * 52, 10000))
+    } else { # this means it's daily
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 365, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 365, 10000))
+    }
+}
+nyc_jobs_salaries$salary_from_adjusted <- salary_from_adjusted
+nyc_jobs_salaries$salary_to_adjusted <- salary_to_adjusted
+```
+
+```{r dataframe keyword integration 3}
+skills_salary <- merge(nyc_jobs_skills,nyc_jobs_salaries)
+skills_salary <- skills_salary[c('job_id','salary_range_from','skill_extract')]
+
+library(splitstackshape)
+split_skills <- cSplit(skills_salary, "skill_extract", ", ")
+```
+
+Will do this 11x over for the 11 skill_extract_columns, forming a 2 column dataframe salary_range_median | skill where there will be duplicate skill values. Then take the group_by(skill) |> summary(median) of that 2 column dataframe to get final median value.
+
+```{r dataframe skill split analyze 1}
+df1 <- split_skills |>
+  group_by(skill_extract_01) |>
+  summarise(med = median(salary_range_from))
+```
+
+Skill Analysis Conclusions
+- Of the 3,261 jobs listed on the NYC government site, 57.5% required a data science skill.
+- There were 47 individual data science skills mentioned on the NYC jobs postings.
+- The most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the data science workflow category of "Data Acquisition." 
+- While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
+- TBD re: Salaries
+
+### Analyzing Association With Other Factors
+
+Since we've answered the question about which are the most valued data science skills, let's also take a stab at related questions with the information we have
+
+##### Mutating Data Based on Keywords
+
+For the second part of our data analysis we take a slightly different approach to looking into keyword matches. We only care about what category each match comes from and total up the keywords coming from those categories into columns.
 
 ```{r keyword mutation}
 # Create the new columns in the data frame which count up keyword matches within each category
@@ -749,11 +880,6 @@ nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
 dbDisconnect(my_connection)
 ```
 
-
-#### Analyzing Association With Other Factors
-
-Since we've answered the question about which are the most valued data science skills, let's also take a stab at related questions with the information we have
-
 ##### Which job category has the most postings for Data related roles?
 
 Let's assume we were a data scientists looking through these postings, and we wanted to filter down the jobs to be most relevant to data science through the job category. As there is no direct "data science" category, we can analyze our data to find which category has the most postings for data related roles.
@@ -815,7 +941,7 @@ As we can see, the distribution of data science job by agency for the top 10 is 
 
 Now let's say that we wanted to look at what job titles we should be applying for based on what type of data science skill we've specialize in. Using our data we can determine what job titles correspond to each skillset the most. We use the civil service title for determining job titles as they are much more general than the business titles.
 
-```{r job title breakdown, fig.width=20, fig.height=20}
+```{r job title breakdown, fig.width=20, fig.height=20, message=FALSE}
 library(patchwork)
 library(purrr)
 library(cowplot)
