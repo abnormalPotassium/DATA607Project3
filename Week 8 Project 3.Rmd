@@ -288,7 +288,7 @@ head(counts_by_agency, 10)
 In total, there are 1,048 different agencies and no agency is more prevalent in job postings than another. The fact that the largest one only has 44 current job postings out of 3k+ (\~1%) shows that it's an extremely diverse collection of jobs.
 
 
-### Posting Type
+#### Posting Type
 
 Are a majority of these listings internal or external?
 
@@ -549,7 +549,8 @@ Now that the data has been loaded into SQL, tidied, and explored, we will answer
 
 As we only need a subset of data from two tables for our analysis, we will go ahead and run a SQL query to retrieve the columns that we want.
 
-Not every field within our database is helpful for answering the project question. Here we create a custom table through a join, pulling only fields which can be searched for data science skills: business_title (e.g. data analyst), job_category (e.g. Finance), job_description, minimum_qual (e.g. college major), and preferred_skills. This table is 3,260 rows long with each row being a job posting.
+Not every field within our database is helpful for answering the project question. Here we create a custom table through a join, pulling only fields which can be searched for data science skills: business_title (e.g. data analyst), job_category (e.g. Finance), job_description, minimum_qual (e.g. college major), and preferred_skills. This table is 3,260 rows long with each row being a job posting. 
+
 
 ```{r get combined tables}
 
@@ -583,7 +584,7 @@ For each job posting (row) we want to find all mentions of data science skills, 
 
 First we need to define the skills we'll search for. These keywords were generated using a combination of domain knowledge, Google Ads keyword planner, and skimming the jobs data set for requested skills. While leveraging regular expressions could make this list of keywords shorter, because there are generally so many keywords of interest, the amount of time to write regex for each would be burdensome. Therefore for this project we will searchf for whole keywords, while avoiding ambiguity.
 
-```{r}
+```{r keyword definition}
 data_acq_keys <- tolower(
   c("SQL", "MySQL", "data acquisition", "database", "dbms", "JSON", "API", "data entry", "data scraping", "mongodb", "postgre", "mariadb", "data extraction", "web scraping", "etl", "data collection", "web crawling", "data warehouse", "azure", "Amazon Web Services" )
 )
@@ -591,7 +592,7 @@ data_prep_keys <- tolower(
   c("Alteryx", "Knime",  "data engineering", "preprocessing", "data preparation", "data cleaning", "data wrangling", "data transformation", "data integration", "normalization", "imputation", "data formatting", "data merging", "data enrichment", "data augmentation", "data sampling","data reduction", "dplyr", "stringr", "pandas" )
 )
 data_exp_keys <- tolower(
-  c("exploratory data analysis", "feature selection", "data engineering", "data exploration", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "dimension reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection",  "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "kusto", "azure data explorer")
+  c("exploratory data analysis", "feature selection", "data research", "data exploration", "Descriptive Statistics", "Data Profiling", "Data Quality Assessment", "Data Sampling", "Dimensionality Reduction", "dimension reduction", "Feature Engineering", "Correlation Analysis", "Outlier Detection",  "databricks","data quality analysis","data summary", "data explorer", "exploratory data analysis", "kusto", "azure data explorer")
 )
 data_anal_keys <- tolower(
   c("data modeling", "machine learning", "data analysis", "artificial intelligence", "quantitative analysis", "predictive analysis", "regression", "Statistical Analysis", "statistical analytics", "Cluster Analysis", "Hypothesis Testing", "A/B Testing", "Data Mining", "natural language processing", "scikit-learn", "pytorch", "data analytics","pandas", "RStudio", "spss" )
@@ -609,11 +610,11 @@ data_science_categories <- list(
 )
 ```
 
-##### Skill Scrape
+#### Skill Scrape
 
 To begin this analysis we can look at the count of keywords within the relevant dataframe columns as a whole. Although, this new dataframe can not be used for much further analyis, it would provide us a simple answer to which data science skills are most in demand based on this dataset.
 
-```{r detect keywords}
+```{r detect keywords, message=FALSE}
 library(scales)
 library(stringi)
 
@@ -658,168 +659,25 @@ The dataframe keyword_count now shows the volume of mentions for each skill insi
 ```{r head keyword_count}
 head(arrange(keyword_count,desc(count)), n = 10)
 ```
-
-We can also breakdown the data by category and see data acquisiton skills are most in demand within our data.
-```{r high level category count}
-
-keyword_count |>
-  group_by(category) |>
-  dplyr::summarise(count = sum(count)) |>
-  arrange(count) |>
-  ggplot(aes(x= reorder(category,count),y=count, fill = category))+
-    geom_bar(stat="identity", show.legend = FALSE) +
-    xlab("Data Science Category") +
-    ylab("Job Listing Count") +
-    labs(title = "Data Science Categories in NY Job Listings", caption = "(Based on data from NYC OpenData)") +
-    geom_text(aes(label=count)) +
-    coord_flip()
-
-```
-
-There were 47 individual data science skills mentioned on the NYC jobs postings.
-
-```{r keyword_count count}
-keyword_count |>
-  filter(count>0) |>
-  nrow()
-```
-
-Showing only skills with more than 10 occurrences in the dataset, then charting them. Colors based on category of Data Science skill.
-
-To answer the primary project question, the most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the category of "Data Acquisition."
-
-```{r keyword occurence bar graph}
-keyword_count |>
-  filter(count>10) |>
-  group_by(keyword,category) |>
-  summarise(count = sum(count)) |>
-  arrange(count) |>
-  ggplot(aes(x= reorder(keyword,count),y=count, fill = category))+
-    geom_bar(stat="identity", show.legend = TRUE) +
-    xlab("Data Science Skill") +
-    ylab("Job Listing Count") +
-    labs(title = "Data Science Skills in NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
-    guides(fill=guide_legend(title="Skill Category")) +
-    geom_text(aes(label=count)) +
-    coord_flip()
-```
-
-Of the 3,261 jobs listed on the NYC government site, 57.5% require a data science skill.
-
-```{r percentage skills}
-nyc_jobs_combination |>
-  filter(total_datascience_keywords>0) |>
-  nrow()/nrow(nyc_jobs_combination)
-```
-
-While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
-
-```{r percentage skills breakdown}
-keyword_count <- keyword_count |> 
-  group_by(category,keyword) |>
-  mutate(pct_all_jobs = percent(count/nrow(nyc_jobs_combination)))
-```
-
-```{r more keyword breakdown}
-keyword_count |>
-  filter(pct_all_jobs>=0.5) |>
-  group_by(keyword,category,pct_all_jobs) |>
-  summarise(pct = sum(count)/nrow(nyc_jobs_combination))|>
-  ggplot(aes(x= reorder(keyword,pct),y=round(pct,2)*100, fill = category))+
-    geom_bar(stat="identity", show.legend = TRUE) +
-    xlab("Data Science Skill") +
-    ylab("% of All Jobs Requiring Skill") +
-    labs(title = "Top Data Science Skills as % of NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
-    guides(fill=guide_legend(title="Skill Category")) +
-    geom_text(aes(label=percent(round(pct,3)))) +
-    coord_flip()
-```
-
-##### Orginal Dataframe Keyword Integration
-
-If we combine our scraped skills list with information in the original database, we can look at the median base salaries for jobs requiring a given skill. Median base salaries are based on the median value of aggregated "Salary From" value for jobs requiring a given skill.
-
-```{r dataframe keyword integration}
-ds_keywords_full <- c(data_acq_keys,data_prep_keys,data_exp_keys,data_anal_keys,data_vis_keys)
-
-nyc_jobs_w_skills <- nyc_jobs_combination |> 
-  rowwise() |>
-  mutate(skill_extract = paste(ds_keywords_full[map_lgl(ds_keywords_full, ~ any(grepl(.x, c_across(business_title:preferred_skills))))], collapse = ", "))
-
-nyc_jobs_skills <- nyc_jobs_w_skills[c('job_id','skill_extract')]
-```
-
-```{r dataframe keyword integration 2}
-library(plyr)
-
-nyc_jobs_salaries <- dbGetQuery(my_connection, "select job_id, salary_range_from, salary_range_to, salary_frequency from nyc_jobs_basics")
-
-salary_from_adjusted <- c()
-salary_to_adjusted <- c()
-freq <- ""
-
-for(i in 1:nrow(nyc_jobs_salaries)) {
-    freq <- nyc_jobs_salaries$salary_frequency[i]
-    if (freq == "Annual") {
-      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i], 10000))
-      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i], 10000))
-    } else if (freq == "Hourly") {
-      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 40 * 52, 10000))
-      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 40 * 52, 10000))
-    } else { # this means it's daily
-      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 365, 10000))
-      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 365, 10000))
-    }
-}
-nyc_jobs_salaries$salary_from_adjusted <- salary_from_adjusted
-nyc_jobs_salaries$salary_to_adjusted <- salary_to_adjusted
-```
-
-```{r dataframe keyword integration 3}
-skills_salary <- merge(nyc_jobs_skills,nyc_jobs_salaries)
-skills_salary <- skills_salary[c('job_id','salary_range_from','skill_extract')]
-
-library(splitstackshape)
-split_skills <- cSplit(skills_salary, "skill_extract", ", ")
-```
-
-Will do this 11x over for the 11 skill_extract_columns, forming a 2 column dataframe salary_range_median | skill where there will be duplicate skill values. Then take the group_by(skill) |> summary(median) of that 2 column dataframe to get final median value.
-
-```{r dataframe skill split analyze 1}
-df1 <- split_skills |>
-  group_by(skill_extract_01) |>
-  summarise(med = median(salary_range_from))
-```
-
-Skill Analysis Conclusions
-- Of the 3,261 jobs listed on the NYC government site, 57.5% required a data science skill.
-- There were 47 individual data science skills mentioned on the NYC jobs postings.
-- The most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the data science workflow category of "Data Acquisition." 
-- While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
-- TBD re: Salaries
-
-### Analyzing Association With Other Factors
-
-Since we've answered the question about which are the most valued data science skills, let's also take a stab at related questions with the information we have
-
 ##### Mutating Data Based on Keywords
 
-For the second part of our data analysis we take a slightly different approach to looking into keyword matches. We only care about what category each match comes from and total up the keywords coming from those categories into columns.
+In order to be able to truly relate the keywords within each column to other information within the dataset, we will need to create new columns on the dataset that detects matches for each data science skill category. The number of matches is stored as an integer for each column. We then also create a total matches that can perhaps be used to measure how relevant a job is to data science.
 
-```{r keyword mutation}
+```{r keyword mutation, warning=FALSE}
 # Create the new columns in the data frame which count up keyword matches within each category
 for (category_name in names(data_science_categories)) {
   nyc_jobs_combination[[category_name]] <- as_tibble(sapply(data_science_categories[[category_name]],grepl,apply(nyc_jobs_combination[, 4:6], 1, paste, collapse = " "))) %>%
-    mutate(!!category_name := as.integer(rowSums(across(where(is.logical)))), .keep="none") %>%
+    dplyr::mutate(!!category_name := as.integer(rowSums(across(where(is.logical)))), .keep="none") %>%
     pull(!!category_name)
 }
 
 # Create a column for total data science matches in the data frame
 nyc_jobs_combination <- nyc_jobs_combination |>
-  mutate(total_datascience_keywords = as.integer(rowSums(across(data_acquisition:data_visualization))))
+  dplyr::mutate(total_datascience_keywords = as.integer(rowSums(across(data_acquisition:data_visualization))))
 
 glimpse(nyc_jobs_combination)
 ```
+
 As we'll be utilizing this dataframe between group members, it makes sense to make a new database table for storing this dataframe data so it can quickly be referenced.
 
 ```{r new combination table, eval = FALSE}
@@ -879,6 +737,213 @@ nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
 
 dbDisconnect(my_connection)
 ```
+
+We can also breakdown the data by category and see data acquisition skills are most in demand within our data.
+```{r high level category count}
+
+keyword_count |>
+  group_by(category) |>
+  dplyr::summarise(count = sum(count)) |>
+  arrange(count) |>
+  ggplot(aes(x= reorder(category,count),y=count, fill = category))+
+    geom_bar(stat="identity", show.legend = FALSE) +
+    xlab("Data Science Category") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Science Categories in NY Job Listings", caption = "(Based on data from NYC OpenData)") +
+    geom_text(aes(label=count)) +
+    coord_flip()
+
+```
+
+There were 47 individual data science skills mentioned on the NYC jobs postings.
+
+```{r keyword_count count}
+keyword_count |>
+  dplyr::filter(count>0) |>
+  nrow()
+```
+
+Of the 3,261 jobs listed on the NYC government site, 57.5% require a data science skill.
+
+```{r percentage skills}
+nyc_jobs_combination |>
+  dplyr::filter(total_datascience_keywords>0) |>
+  nrow()/nrow(nyc_jobs_combination)
+```
+
+Showing only skills with more than 10 occurrences in the dataset, then charting them. Colors based on category of Data Science skill.
+
+To answer the primary project question, the most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the category of "Data Acquisition."
+
+```{r keyword occurence bar graph, message = FALSE}
+keyword_count |>
+  dplyr::filter(count>=10) |>
+  dplyr::group_by(keyword,category) |>
+  dplyr::summarise(count = sum(count)) |>
+  arrange(count) |>
+  ggplot(aes(x= reorder(keyword,count),y=count, fill = category))+
+    geom_bar(stat="identity", show.legend = TRUE) +
+    xlab("Data Science Skill") +
+    ylab("Job Listing Count") +
+    labs(title = "Data Science Skills in NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
+    guides(fill=guide_legend(title="Skill Category")) +
+    geom_text(aes(label=count)) +
+    coord_flip()
+```
+
+
+While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
+
+```{r percentage skills breakdown}
+keyword_count <- keyword_count |> 
+  group_by(category,keyword) |>
+  mutate(pct_all_jobs = percent(count/nrow(nyc_jobs_combination)))
+```
+
+```{r more keyword breakdown, message = FALSE}
+keyword_count |>
+  filter(pct_all_jobs>=0.5) |>
+  group_by(keyword,category,pct_all_jobs) |>
+  dplyr::summarise(pct = sum(count)/nrow(nyc_jobs_combination))|>
+  ggplot(aes(x= reorder(keyword,pct),y=round(pct,2)*100, fill = category))+
+    geom_bar(stat="identity", show.legend = TRUE) +
+    xlab("Data Science Skill") +
+    ylab("% of All Jobs Requiring Skill") +
+    labs(title = "Top Data Science Skills as % of NYC Job Listings", caption = "(Based on data from NYC OpenData)") +
+    guides(fill=guide_legend(title="Skill Category")) +
+    geom_text(aes(label=percent(round(pct,3)))) +
+    coord_flip()
+```
+
+##### Orginal Dataframe Keyword Integration
+
+If we combine our scraped skills list with information in the original database, we can look at the median base salaries for jobs requiring a given skill. Median base salaries are based on the median value of aggregated "Salary From" value for jobs requiring a given skill.
+
+```{r dataframe keyword integration}
+ds_keywords_full <- c(data_acq_keys,data_prep_keys,data_exp_keys,data_anal_keys,data_vis_keys)
+
+nyc_jobs_w_skills <- nyc_jobs_combination |> 
+  rowwise() |>
+  dplyr::mutate(skill_extract = paste(ds_keywords_full[map_lgl(ds_keywords_full, ~ any(grepl(.x, c_across(business_title:preferred_skills))))], collapse = ", "))
+
+nyc_jobs_skills <- nyc_jobs_w_skills[c('job_id','skill_extract')]
+```
+
+```{r dataframe keyword integration 2}
+library(plyr)
+
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd = key_get("Project3SQL","Overview8909"),
+                           encoding = "latin1"
+                           )
+
+nyc_jobs_salaries <- dbGetQuery(my_connection, "select job_id, salary_range_from, salary_range_to, salary_frequency from nyc_jobs_basics")
+
+dbDisconnect(my_connection)
+
+salary_from_adjusted <- c()
+salary_to_adjusted <- c()
+freq <- ""
+
+for(i in 1:nrow(nyc_jobs_salaries)) {
+    freq <- nyc_jobs_salaries$salary_frequency[i]
+    if (freq == "Annual") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i], 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i], 10000))
+    } else if (freq == "Hourly") {
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 40 * 52, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 40 * 52, 10000))
+    } else { # this means it's daily
+      salary_from_adjusted <- append(salary_from_adjusted, round_any(nyc_jobs_basics$salary_range_from[i] * 365, 10000))
+      salary_to_adjusted <- append(salary_to_adjusted, round_any(nyc_jobs_basics$salary_range_to[i] * 365, 10000))
+    }
+}
+nyc_jobs_salaries$salary_from_adjusted <- salary_from_adjusted
+nyc_jobs_salaries$salary_to_adjusted <- salary_to_adjusted
+```
+
+```{r dataframe keyword integration 3, warning = FALSE, message = FALSE}
+skills_salary <- merge(nyc_jobs_skills,nyc_jobs_salaries)
+skills_salary <- skills_salary[c('salary_from_adjusted','skill_extract')]
+
+library(splitstackshape)
+split_skills <- cSplit(skills_salary, "skill_extract", ", ")
+
+skills_long <- split_skills |>
+  pivot_longer(cols=c('skill_extract_01',
+                      'skill_extract_02',
+                      'skill_extract_03',
+                      'skill_extract_04',
+                      'skill_extract_05',
+                      'skill_extract_06',
+                      'skill_extract_07',
+                      'skill_extract_08',
+                      'skill_extract_09',
+                      'skill_extract_10',
+                      'skill_extract_11'),
+               names_to='skill_extract',
+               values_to='skill')
+
+skills_long <- skills_long[c('salary_from_adjusted','skill')]
+skills_long <- skills_long[complete.cases(skills_long),]
+```
+
+skills_long dataframe has the information we need to calculate median salary by skill. Now we'll just add the data science skills categorizations from our keyword_count df above, and remove hourly wages. 
+
+```{r median salary by skill, message = FALSE}
+skills_final <- merge(x=skills_long,y=keyword_count,by.x=c('skill')
+                         ,by.y=c('keyword'))
+
+skills_final <- skills_final[c('skill','salary_from_adjusted','category')]
+skills_final <- skills_final %>%
+  dplyr::filter(salary_from_adjusted>0) %>%
+  dplyr::group_by(skill,category) %>%
+  dplyr::summarise(median_starting_salary = median(salary_from_adjusted))
+  
+```
+
+Graphing all 47 skills mentioned in the job postings would make an overly crowded chart. Therefore we will a) Make a combined chart showing the top 10 skills across categories by salary; B) Display all skills by first grouping them by skill category before charting. Even after grouping, a cowplot is not big enough to make the skill labels read-able, therefore we will print them individually. The knitted R Pubs document will place them in one container for easier comparison.
+
+```{r}
+top_salary_skills <- skills_final |> filter (median_starting_salary > 80000) |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE) + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Top Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+
+skills_acq_graph <- skills_final |> filter(category == 'Data Acquisition') |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE,fill='#f8766d') + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Data Acquisition Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+
+skills_analysis_graph <- skills_final |> filter(category == 'Data Analysis') |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE,fill='#a3a500') + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Data Analysis Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+
+skills_exploration_graph <- skills_final |> filter(category == 'Data Exploration') |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE,fill='#00bf7d') + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Data Exploration Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+
+skills_preparation_graph <- skills_final |> filter(category == 'Data Preparation') |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE,fill='#00b0f6') + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Data Preparation Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+
+skills_visualization_graph <- skills_final |> filter(category == 'Data Visualization') |> dplyr::arrange(median_starting_salary) |> ggplot(aes(x= reorder(skill,median_starting_salary),y=median_starting_salary, fill = category)) + geom_bar(stat="identity", show.legend = TRUE,fill='#e76bf3') + xlab("Data Science Skill") + ylab("Median Starting Salary of Job Requiring Skill") + labs(title = "Data Visualization Skills by Base Salary in NYC Job Listings", caption = "(Based on data from NYC OpenData)") + guides(fill=guide_legend(title="Skill Category")) + coord_flip() + scale_y_continuous(labels = scales::label_dollar(scale=0.001,suffix="K")) + geom_text(aes(label=dollar_format(scale=0.001,suffix="K")(median_starting_salary)))
+```
+
+There are 12 skills which offer a median starting salary of $85,000 or more in the NYC job listings. Perhaps surprisingly, only one "Data Visualization" skill is in the top 12, tied for #1: "UX design." In general though, a mix of skill categories make up the top 12. Top paying skills by category: 
+- Data Acquisition: "JSON" - $100K
+- Data Analysis: "Data Modeling" - $95K
+- Data Exploration: "Data Profiling" - $100K
+- Data preparation: "Data Formatting" - $95K
+- Data Visualization: "User Experience Design" - $100K
+
+If one was interested in pursuing an NYC government job, and was particularly interested in one of these categories, they could use these data as a reference point on where to invest their time. 
+
+```{r}
+#Printing charts
+top_salary_skills
+skills_acq_graph
+skills_analysis_graph
+skills_exploration_graph
+skills_preparation_graph
+skills_visualization_graph
+```
+
+### Analyzing Association With Other Factors
+
+Since we've answered the question about which are the most valued data science skills, let's also take a stab at related questions with the information we have.
 
 ##### Which job category has the most postings for Data related roles?
 
@@ -1029,7 +1094,7 @@ nyc_jobs_basics_small3$salary_to_adjusted <- salary_to_adjusted
 
 nyc_jobs_basics_small3 <- nyc_jobs_basics_small3 |>
   select(job_id,salary_from_adjusted, salary_to_adjusted) |>
-  mutate(salary_mid_adjusted = (salary_from_adjusted + salary_to_adjusted)/2) |>
+  dplyr::mutate(salary_mid_adjusted = (salary_from_adjusted + salary_to_adjusted)/2) |>
   select(job_id,salary_mid_adjusted)
 
 nyc_jobs_combination3 <- nyc_jobs_combination |>
@@ -1054,5 +1119,35 @@ cor(x=nyc_jobs_combination3$total_datascience_keywords,y=nyc_jobs_combination3$s
 With a correlation of 0.11 between pay and total data science keyword count, we can say that within our data there is no relationship between the two. A very unfortunate discovery.
 
 ## Conclusions
+
+#### Data Cleaning Conclusions
+- The Department of Citywide Administrative Services compiled our data science skills data.
+- The data is hosted by NYC OpenData and includes detailed info for all current openings for New York City government-related positions. 
+- The data source was originally published in 2013 and updates weekly.
+- We downloaded the data, cleaned it, and divided its contents into a four-table information schema:
+1. NYC Jobs Basics (business title, salary, posting date, etc.)
+2. NYC Jobs Specifics (minimum qualifications, work location, job description, etc.)
+3. NYC Jobs Agencies (work agency and agency location)
+2. NYC Jobs Codes (civil service title, title classification, and title level)
+- Cleaning the data primarily entailed removing non alpha-numeric characters, changing empty strings to NA, and rounding long numeric figures such as salaries.
+- After cleaning the data, we pushed the schema to an Azure, cloud-based database, which we access as a group via SQL in our RMD files.
+- For the analysis portion, we created a dictionary of data science skills, grouped by data science workflow category (acquisition, analysis, exploration, preparation, and visualization). We searched each job posting for these skills, tallying which skills were mentioned most-often, and using that information to answer the project question "Which are the most valued data science skills?"
+
+#### Data Exploration Conclusions
+- The data included 3,260 job listings, 94% of which were posted in 2022 or 2023, but with some dating back to 2014. 
+- 92% of jobs were full-time, 55% were for the NYC government itself (vs. contractor positions), and 89% received an annual salary (vs. hourly or daily).
+- 1048 agencies and 192 job categories were represented in the jobs data. The Bureau of Wastewater Treatment (BWT) was the top agency, with 43 postings or 1.32% of the total. "Engineering, Architecture, and Planning" was the top job category, with 433 positions or 13.28% of the total.
+- Including estimates for hourly and daily workers, the median salary was $75,000 per year, while the mean was $76,716. The minimum was $30,000 and the maximum was $230,000. The salaries adhere to a generally normal distribution. 
+
+#### Most Valued Skills Conclusions
+- Of the 3,261 jobs listed on the NYC government site, more than half (57.5%) required a data science skill. 
+- There were 47 different data science skills mentioned in the listings. The most in-demand skill, "database," was found in 459 or 14.1% of all posts, followed by "data entry" in 214 posts (8%), "data analysis" in 117 posts (6.6%), "SQL" (193 posts - 5.9%), and "data collection" (117 posts - 3.6%)
+- The top 12 skills by base salary came from five different data science workflow categories. The top 12 included: four data preparation skills, four data acquisition skills, two data analysis skills, and 1 skill each from data exploration and data visualization.
+- Job postings including the skills "UX Design," "JSON," and "Data Profiling," had the highest median base salaries, all at $100K. 
+
+#### Findings Related to "Most Valued Skills" Conclusions
+- If you're interested in pursuing a data science job, many different NYC government agencies offer opportunities. 51 different agencies have a job posting requiring DS skills, most notably The Department of Environmental Protection (42 postings), The Department of Social Services (36), and Housing Preservation and Development (35).
+- Don't limit your career search to jobs classified under the "Technology, Data, & Innovation" category. While that categorization accounts for the most DS jobs (113), there are many in "qualitative" areas: for example 21 in Constituent Services & Community Programs and 15 in Administration & Human Resources.
+- We found a weak but visible correlation between the number of data science skills in a job posting and the median salary range for that job. 
 
 ...
