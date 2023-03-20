@@ -33,6 +33,8 @@ my_connection <- dbConnect(drv = odbc::odbc(),
 
 Not every field within our database is helpful for answering the project question. Here we create a custom table through a join, pulling only fields which can be searched for data science skills: business_title (e.g. data analyst), job_category (e.g. Finance), job_description, minimum_qual (e.g. college major), and preferred_skills. This table is 3,260 rows long with each row being a job posting. 
 
+
+
 ```{r}
 nyc_jobs_combination_sql <- "SELECT b.job_id, b.business_title, b.job_category, s.job_description, s.minimum_qual, s.preferred_skills FROM nyc_jobs_basics as b JOIN nyc_jobs_specifics as s ON b.job_id = s.job_id"
 
@@ -143,6 +145,27 @@ keyword_count |>
   filter(count>0) |>
   nrow()
 ```
+```{r get combination table}
+nyc_jobs_combination_sql <- "select * from nyc_jobs_combination"
+my_connection <- dbConnect(drv = odbc::odbc(),
+                           Driver = "ODBC Driver 18 for SQL Server",
+                           server = "tcp:data607project3server.database.windows.net,1433",
+                           database = "Data 607 Project 3 Database",
+                           uid = "Overview8909",
+                           pwd = key_get("Project3SQL","Overview8909"),
+                           encoding = "latin1"
+                           )
+nyc_jobs_combination <- dbGetQuery(my_connection, nyc_jobs_combination_sql)
+dbDisconnect(my_connection)
+```
+
+Of the 3,261 jobs listed on the NYC government site, 57.5% require a data science skill.
+
+```{r percentage skills}
+nyc_jobs_combination |>
+  dplyr::filter(total_datascience_keywords>0) |>
+  nrow()/nrow(nyc_jobs_combination)
+```
 
 Showing only skills with more than 10 occurrences in the dataset, then charting them. Colors based on category of Data Science skill.
 
@@ -163,13 +186,6 @@ keyword_count |>
     coord_flip()
 ```
 
-Of the 3,261 jobs listed on the NYC government site, 57.5% require a data science skill.
-
-```{r}
-nyc_jobs_combination |>
-  filter(total_datascience_keywords>0) |>
-  nrow()/nrow(nyc_jobs_combination)
-```
 While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
 
 ```{r}
@@ -301,11 +317,34 @@ skills_exploration_graph
 skills_preparation_graph
 skills_visualization_graph
 ```
+## Conclusions
 
+####Data Cleaning Conclusions
+- The Department of Citywide Administrative Services compiled our data science skills data.
+- The data is hosted by NYC OpenData and includes detailed info for all current openings for New York City government-related positions. 
+- The data source was originally published in 2013 and updates weekly.
+- We downloaded the data, cleaned it, and divided its contents into a four-table information schema:
+1. NYC Jobs Basics (business title, salary, posting date, etc.)
+2. NYC Jobs Specifics (minimum qualifications, work location, job description, etc.)
+3. NYC Jobs Agencies (work agency and agency location)
+2. NYC Jobs Codes (civil service title, title classification, and title level)
+- Cleaning the data primarily entailed removing non alpha-numeric characters, changing empty strings to NA, and rounding long numeric figures such as salaries.
+- After cleaning the data, we pushed the schema to an Azure, cloud-based database, which we access as a group via SQL in our RMD files.
+- For the analysis portion, we created a dictionary of data science skills, grouped by data science workflow category (acquisition, analysis, exploration, preparation, and visualization). We searched each job posting for these skills, tallying which skills were mentioned most-often, and using that information to answer the project question "Which are the most valued data science skills?"
 
-Skill Analysis Conclusions
-- Of the 3,261 jobs listed on the NYC government site, 57.5% required a data science skill.
-- There were 47 individual data science skills mentioned on the NYC jobs postings.
-- The most in-demand data science skills were "database" (459 mentions) followed by "data entry" (261), "data analysis" (214), "SQL" (193), and "data collection" (117). Four of these top five fall under the data science workflow category of "Data Acquisition." 
-- While 57.5% of all job posting required a data science skill, those jobs requested a varied array of skills. The three most in-demand skills, "database," "data entry," and "data analysis," were found in 14.1%, 8.0%, and 6.6% of all job postings. 
-- The top 12 skills by base salary came from all the data science workflow categories: 4 data preparation skills made up the top 12, 4 data acquisition skills, 2 data analysis skills, and 1 skill each from data exploration and data visualization.
+####Data Exploration Conclusions
+- The data included 3,260 job listings, 94% of which were posted in 2022 or 2023, but with some dating back to 2014. 
+- 92% of jobs were full-time, 55% were for the NYC government itself (vs. contractor positions), and 89% received an annual salary (vs. hourly or daily).
+- 1048 agencies and 192 job categories were represented in the jobs data. The Bureau of Wastewater Treatment (BWT) was the top agency, with 43 postings or 1.32% of the total. "Engineering, Architecture, and Planning" was the top job category, with 433 positions or 13.28% of the total.
+- Including estimates for hourly and daily workers, the median salary was $75,000 per year, while the mean was $76,716. The minimum was $30,000 and the maximum was $230,000. The salaries adhere to a generally normal distribution. 
+
+####Most Valued Skills Conclusions
+- Of the 3,261 jobs listed on the NYC government site, more than half (57.5%) required a data science skill. 
+- There were 47 different data science skills mentioned in the listings. The most in-demand skill, "database," was found in 459 or 14.1% of all posts, followed by "data entry" in 214 posts (8%), "data analysis" in 117 posts (6.6%), "SQL" (193 posts - 5.9%), and "data collection" (117 posts - 3.6%)
+- The top 12 skills by base salary came from five different data science workflow categories. The top 12 included: four data preparation skills, four data acquisition skills, two data analysis skills, and 1 skill each from data exploration and data visualization.
+- Job postings including the skills "UX Design," "JSON," and "Data Profiling," had the highest median base salaries, all at $100K. 
+
+####Findings Related to "Most Valued Skills" Conclusions
+- If you're interested in pursuing a data science job, many different NYC government agencies offer opportunities. 51 different agencies have a job posting requiring DS skills, most notably The Department of Environmental Protection (42 postings), The Department of Social Services (36), and Housing Preservation and Development (35).
+- Don't limit your career search to jobs classified under the "Technology, Data, & Innovation" category. While that categorization accounts for the most DS jobs (113), there are many in "qualitative" areas: for example 21 in Constituent Services & Community Programs and 15 in Administration & Human Resources.
+- We found a weak but visible correlation between the number of data science skills in a job posting and the median salary range for that job. 
